@@ -1,0 +1,64 @@
+services:
+  backend:
+    build:
+      context: fastapi-backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://postgres:password@db:5432/mydatabase
+      - OPENAPI_OUTPUT_FILE=./shared-data/openapi.json
+    ports:
+      - "8000:8000"
+    networks:
+      - app_network
+    volumes:
+      - ./fastapi-backend:/app
+      - fastapi-venv:/app/.venv
+      - ./local-shared-data:/app/shared-data
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./nextjs-frontend
+      dockerfile: Dockerfile
+    user: node
+    ports:
+      - "3000:3000"
+    networks:
+      - app_network
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - OPENAPI_OUTPUT_FILE=./shared-data/openapi.json
+    volumes:
+      - ./nextjs-frontend:/app
+      - nextjs-node-modules:/app/node_modules
+      - ./local-shared-data:/app/shared-data
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    networks:
+      - app_network
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./fastapi-backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  nextjs-node-modules:
+  fastapi-venv:
+
+networks:
+  app_network:
+    driver: bridge 
